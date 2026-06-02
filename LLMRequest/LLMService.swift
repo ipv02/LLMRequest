@@ -10,7 +10,7 @@ import Foundation
 final class LLMService {
     static let shared = LLMService()
 
-    private let apiKey = "ТВОЙ_PROXY_API_KEY"
+    private let apiKey = "API_KEY"
 
     private let url = URL(string: "https://openai.api.proxyapi.ru/v1/chat/completions")!
     private let model = "openai/gpt-4o"
@@ -45,8 +45,11 @@ final class LLMService {
             stop: [stopSequence]
         )
     }
+}
 
-    private func performRequest(
+private extension LLMService {
+    
+    func performRequest(
         messages: [[String: String]],
         maxTokens: Int? = nil,
         stop: [String]? = nil
@@ -81,7 +84,7 @@ final class LLMService {
         return content ?? String(data: data, encoding: .utf8) ?? "Нет ответа"
     }
 
-    private func message(role: String, content: String) -> [String: String] {
+    func message(role: String, content: String) -> [String: String] {
         [
             "role": role,
             "content": content
