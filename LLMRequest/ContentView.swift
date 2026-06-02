@@ -29,7 +29,7 @@ struct ContentView: View {
                 if isLoading {
                     ProgressView()
                 } else {
-                    Text("Отправить")
+                    Text("Сравнить ответы")
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -53,12 +53,28 @@ struct ContentView: View {
         answer = ""
         
         do {
-            let result = try await LLMService.shared.requestLLM(prompt: prompt)
+            async let unrestrictedAnswer = LLMService.shared.requestLLM(prompt: prompt)
+            async let controlledAnswer = LLMService.shared.requestControlledLLM(prompt: prompt)
+            
+            let result = try await formatComparison(
+                unrestricted: unrestrictedAnswer,
+                controlled: controlledAnswer
+            )
             answer = result
         } catch {
             answer = "Ошибка: \(error.localizedDescription)"
         }
         
         isLoading = false
+    }
+    
+    private func formatComparison(unrestricted: String, controlled: String) -> String {
+        """
+        Без ограничений:
+        \(unrestricted)
+        
+        С ограничениями:
+        \(controlled)
+        """
     }
 }
