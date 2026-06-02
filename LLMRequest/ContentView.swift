@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var answer = ""
     @State private var isProxyLoading = false
     @State private var isDeepSeekLoading = false
+    @FocusState private var isPromptFocused: Bool
     
     private var isRequestRunning: Bool {
         isProxyLoading || isDeepSeekLoading
@@ -30,6 +31,9 @@ struct ContentView: View {
                     endPoint: .bottom
                 )
                 .ignoresSafeArea()
+                .onTapGesture {
+                    hideKeyboard()
+                }
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
@@ -39,7 +43,15 @@ struct ContentView: View {
                         answerCard
                     }
                     .padding(20)
+                    .background {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                hideKeyboard()
+                            }
+                    }
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle("LLM Request")
             .navigationBarTitleDisplayMode(.inline)
@@ -48,7 +60,7 @@ struct ContentView: View {
     
     private var headerView: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Сравнение провайдеров")
+            Text("Запрос в LLM")
                 .font(.largeTitle.bold())
                 .foregroundStyle(.primary)
             
@@ -57,6 +69,10 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            hideKeyboard()
+        }
     }
     
     private var promptCard: some View {
@@ -66,6 +82,7 @@ struct ContentView: View {
                 .foregroundStyle(.primary)
             
             TextEditor(text: $prompt)
+                .focused($isPromptFocused)
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: 132)
                 .padding(12)
@@ -92,6 +109,7 @@ struct ContentView: View {
                 color: .blue,
                 isLoading: isProxyLoading
             ) {
+                hideKeyboard()
                 Task {
                     await sendProxyRequest()
                 }
@@ -104,6 +122,7 @@ struct ContentView: View {
                 color: .purple,
                 isLoading: isDeepSeekLoading
             ) {
+                hideKeyboard()
                 Task {
                     await sendDeepSeekRequest()
                 }
@@ -147,6 +166,10 @@ struct ContentView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(.white.opacity(0.5), lineWidth: 1)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            hideKeyboard()
         }
     }
     
@@ -199,6 +222,10 @@ struct ContentView: View {
         .opacity(isLoading ? 0.82 : 1)
         .accessibilityLabel(title)
         .accessibilityHint(subtitle)
+    }
+    
+    private func hideKeyboard() {
+        isPromptFocused = false
     }
     
     private func sendProxyRequest() async {
