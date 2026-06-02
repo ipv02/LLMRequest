@@ -11,7 +11,8 @@ struct ContentView: View {
     
     @State private var prompt = "Объясни простыми словами, что такое LLM"
     @State private var answer = ""
-    @State private var isLoading = false
+    @State private var isProxyLoading = false
+    @State private var isDeepSeekLoading = false
     
     var body: some View {
         VStack(spacing: 16) {
@@ -21,20 +22,27 @@ struct ContentView: View {
                 .background(.gray.opacity(0.12))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             
-            Button {
-                Task {
-                    await sendRequest()
+            VStack(spacing: 8) {
+                Button {
+                    Task {
+                        await sendProxyRequest()
+                    }
+                } label: {
+                    buttonTitle("Запрос в Proxy", isLoading: isProxyLoading)
                 }
-            } label: {
-                if isLoading {
-                    ProgressView()
-                } else {
-                    Text("Сравнить ответы")
-                        .frame(maxWidth: .infinity)
+                .buttonStyle(.borderedProminent)
+                .disabled(prompt.isEmpty || isProxyLoading)
+                
+                Button {
+                    Task {
+                        await sendDeepSeekRequest()
+                    }
+                } label: {
+                    buttonTitle("Запрос в DeepSeek", isLoading: isDeepSeekLoading)
                 }
+                .buttonStyle(.bordered)
+                .disabled(prompt.isEmpty || isDeepSeekLoading)
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(prompt.isEmpty || isLoading)
             
             ScrollView {
                 Text(answer)
@@ -48,8 +56,8 @@ struct ContentView: View {
         .padding()
     }
     
-    private func sendRequest() async {
-        isLoading = true
+    private func sendProxyRequest() async {
+        isProxyLoading = true
         answer = ""
         
         do {
@@ -57,6 +65,7 @@ struct ContentView: View {
             async let controlledAnswer = LLMService.shared.requestControlledLLM(prompt: prompt)
             
             let result = try await formatComparison(
+                title: "Proxy",
                 unrestricted: unrestrictedAnswer,
                 controlled: controlledAnswer
             )
@@ -65,11 +74,48 @@ struct ContentView: View {
             answer = "Ошибка: \(error.localizedDescription)"
         }
         
-        isLoading = false
+        isProxyLoading = false
     }
     
-    private func formatComparison(unrestricted: String, controlled: String) -> String {
+    private func sendDeepSeekRequest() async {
+        isDeepSeekLoading = true
+        answer = ""
+        
+        do {
+            let result = try await LLMService.shared.request(
+                prompt: prompt,
+                provider: .deepSeek
+            )
+            answer = """
+            DeepSeek:
+            \(result)
+            """
+        } catch {
+            answer = "Ошибка: \(error.localizedDescription)"
+        }
+        
+        isDeepSeekLoading = false
+    }
+    
+    @ViewBuilder
+    private func buttonTitle(_ title: String, isLoading: Bool) -> some View {
+        if isLoading {
+            ProgressView()
+                .frame(maxWidth: .infinity)
+        } else {
+            Text(title)
+                .frame(maxWidth: .infinity)
+        }
+    }
+    
+    private func formatComparison(
+        title: String,
+        unrestricted: String,
+        controlled: String
+    ) -> String {
         """
+        \(title)
+        
         Без ограничений:
         \(unrestricted)
         
