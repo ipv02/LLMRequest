@@ -11,7 +11,7 @@ final class LLMService {
     static let shared = LLMService()
 
     private let apiKey = "ТВОЙ_PROXY_API_KEY"
-    
+
     private let url = URL(string: "https://openai.api.proxyapi.ru/v1/chat/completions")!
     private let model = "openai/gpt-4o"
     private let stopSequence = "###END###"
@@ -19,28 +19,35 @@ final class LLMService {
     private init() {}
 
     func requestLLM(prompt: String) async throws -> String {
-        try await performRequest(prompt: prompt)
+        let messages = [
+            message(role: "user", content: prompt)
+        ]
+
+        return try await performRequest(messages: messages)
     }
 
     func requestControlledLLM(prompt: String) async throws -> String {
-        let controlledPrompt = """
-        \(prompt)
-
-        Требования к ответу:
-        1. Формат: ровно 3 коротких пункта списком.
-        2. Длина: не больше 80 слов.
-        3. Завершение: после третьего пункта напиши \(stopSequence).
+        let systemPrompt = """
+        Отвечай строго по правилам:
+        1. Формат ответа: ровно 3 коротких пункта списком.
+        2. Длина ответа: не больше 80 слов.
+        3. После третьего пункта напиши \(stopSequence).
         """
 
+        let messages = [
+            message(role: "system", content: systemPrompt),
+            message(role: "user", content: prompt)
+        ]
+
         return try await performRequest(
-            prompt: controlledPrompt,
+            messages: messages,
             maxTokens: 160,
             stop: [stopSequence]
         )
     }
 
     private func performRequest(
-        prompt: String,
+        messages: [[String: String]],
         maxTokens: Int? = nil,
         stop: [String]? = nil
     ) async throws -> String {
@@ -51,12 +58,7 @@ final class LLMService {
 
         var body: [String: Any] = [
             "model": model,
-            "messages": [
-                [
-                    "role": "user",
-                    "content": prompt
-                ]
-            ]
+            "messages": messages
         ]
 
         if let maxTokens {
@@ -77,5 +79,12 @@ final class LLMService {
         let content = message?["content"] as? String
 
         return content ?? String(data: data, encoding: .utf8) ?? "Нет ответа"
+    }
+
+    private func message(role: String, content: String) -> [String: String] {
+        [
+            "role": role,
+            "content": content
+        ]
     }
 }
