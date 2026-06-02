@@ -14,46 +14,191 @@ struct ContentView: View {
     @State private var isProxyLoading = false
     @State private var isDeepSeekLoading = false
     
+    private var isRequestRunning: Bool {
+        isProxyLoading || isDeepSeekLoading
+    }
+    
     var body: some View {
-        VStack(spacing: 16) {
-            TextEditor(text: $prompt)
-                .frame(height: 140)
-                .padding(8)
-                .background(.gray.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            
-            VStack(spacing: 8) {
-                Button {
-                    Task {
-                        await sendProxyRequest()
-                    }
-                } label: {
-                    buttonTitle("Запрос в Proxy", isLoading: isProxyLoading)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(prompt.isEmpty || isProxyLoading)
+        NavigationStack {
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(.systemGroupedBackground),
+                        Color(.secondarySystemGroupedBackground)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
                 
-                Button {
-                    Task {
-                        await sendDeepSeekRequest()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        headerView
+                        promptCard
+                        actionButtons
+                        answerCard
                     }
-                } label: {
-                    buttonTitle("Запрос в DeepSeek", isLoading: isDeepSeekLoading)
+                    .padding(20)
                 }
-                .buttonStyle(.bordered)
-                .disabled(prompt.isEmpty || isDeepSeekLoading)
+            }
+            .navigationTitle("LLM Request")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+    
+    private var headerView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Сравнение провайдеров")
+                .font(.largeTitle.bold())
+                .foregroundStyle(.primary)
+            
+            Text("Отправьте один prompt в Proxy с контролем ответа или отдельно проверьте DeepSeek.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    
+    private var promptCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Prompt", systemImage: "text.bubble")
+                .font(.headline)
+                .foregroundStyle(.primary)
+            
+            TextEditor(text: $prompt)
+                .scrollContentBackground(.hidden)
+                .frame(minHeight: 132)
+                .padding(12)
+                .background(.background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(.quaternary, lineWidth: 1)
+                }
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(.white.opacity(0.5), lineWidth: 1)
+        }
+    }
+    
+    private var actionButtons: some View {
+        VStack(spacing: 12) {
+            requestButton(
+                title: "Запрос в Proxy",
+                subtitle: "Обычный + controlled",
+                systemImage: "bolt.fill",
+                color: .blue,
+                isLoading: isProxyLoading
+            ) {
+                Task {
+                    await sendProxyRequest()
+                }
             }
             
-            ScrollView {
-                Text(answer)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
+            requestButton(
+                title: "Запрос в DeepSeek",
+                subtitle: "Один обычный ответ",
+                systemImage: "sparkles",
+                color: .purple,
+                isLoading: isDeepSeekLoading
+            ) {
+                Task {
+                    await sendDeepSeekRequest()
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(.gray.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
-        .padding()
+    }
+    
+    private var answerCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Label("Ответ", systemImage: "doc.text.magnifyingglass")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                
+                Spacer()
+                
+                if isRequestRunning {
+                    Text("Выполняется")
+                        .font(.caption.weight(.medium))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(.blue.opacity(0.12), in: Capsule())
+                        .foregroundStyle(.blue)
+                }
+            }
+            
+            Text(answer.isEmpty ? "Здесь появится ответ модели." : answer)
+                .font(.body)
+                .foregroundStyle(answer.isEmpty ? .secondary : .primary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background(.background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(.quaternary, lineWidth: 1)
+                }
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(.white.opacity(0.5), lineWidth: 1)
+        }
+    }
+    
+    private func requestButton(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        color: Color,
+        isLoading: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(.white.opacity(0.2))
+                        .frame(width: 38, height: 38)
+                    
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Image(systemName: systemImage)
+                            .font(.system(size: 17, weight: .semibold))
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.headline)
+                    Text(subtitle)
+                        .font(.caption)
+                        .opacity(0.82)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "arrow.right.circle.fill")
+                    .font(.title3)
+                    .opacity(isLoading ? 0 : 0.9)
+            }
+            .foregroundStyle(.white)
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 68)
+            .background(color.gradient, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(color: color.opacity(0.25), radius: 12, x: 0, y: 6)
+        }
+        .buttonStyle(.plain)
+        .disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
+        .opacity(isLoading ? 0.82 : 1)
+        .accessibilityLabel(title)
+        .accessibilityHint(subtitle)
     }
     
     private func sendProxyRequest() async {
@@ -95,17 +240,6 @@ struct ContentView: View {
         }
         
         isDeepSeekLoading = false
-    }
-    
-    @ViewBuilder
-    private func buttonTitle(_ title: String, isLoading: Bool) -> some View {
-        if isLoading {
-            ProgressView()
-                .frame(maxWidth: .infinity)
-        } else {
-            Text(title)
-                .frame(maxWidth: .infinity)
-        }
     }
     
     private func formatComparison(
