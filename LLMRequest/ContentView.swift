@@ -13,8 +13,6 @@ struct ContentView: View {
     @State private var answer = ""
     @State private var isLoading = false
     
-    private let apiKey = "ТВОЙ_PROXY_API_KEY"
-    
     var body: some View {
         VStack(spacing: 16) {
             TextEditor(text: $prompt)
@@ -55,42 +53,12 @@ struct ContentView: View {
         answer = ""
         
         do {
-            let result = try await requestLLM(prompt: prompt)
+            let result = try await LLMService.shared.requestLLM(prompt: prompt)
             answer = result
         } catch {
             answer = "Ошибка: \(error.localizedDescription)"
         }
         
         isLoading = false
-    }
-    
-    private func requestLLM(prompt: String) async throws -> String {
-        let url = URL(string: "https://openai.api.proxyapi.ru/v1/chat/completions")!
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let body: [String: Any] = [
-            "model": "openai/gpt-4o",
-            "messages": [
-                [
-                    "role": "user",
-                    "content": prompt
-                ]
-            ]
-        ]
-        
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
-        let (data, _) = try await URLSession.shared.data(for: request)
-        
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let choices = json?["choices"] as? [[String: Any]]
-        let message = choices?.first?["message"] as? [String: Any]
-        let content = message?["content"] as? String
-        
-        return content ?? String(data: data, encoding: .utf8) ?? "Нет ответа"
     }
 }
