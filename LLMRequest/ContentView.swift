@@ -9,14 +9,16 @@ import SwiftUI
 
 struct ContentView: View {
     
-    @State private var prompt = "Объясни простыми словами, что такое LLM"
+    @State private var prompt = "В коробке 12 шаров: 5 красных, 4 синих и 3 зеленых. Сколько минимум шаров нужно достать вслепую, чтобы гарантированно получить два шара одного цвета?"
     @State private var answer = ""
     @State private var isProxyLoading = false
     @State private var isDeepSeekLoading = false
+    @State private var isReasoningExperimentLoading = false
+    
     @FocusState private var isPromptFocused: Bool
     
     private var isRequestRunning: Bool {
-        isProxyLoading || isDeepSeekLoading
+        isProxyLoading || isDeepSeekLoading || isReasoningExperimentLoading
     }
     
     var body: some View {
@@ -64,9 +66,9 @@ struct ContentView: View {
                 .font(.largeTitle.bold())
                 .foregroundStyle(.primary)
             
-            Text("Отправьте один prompt в Proxy с контролем ответа или отдельно проверьте DeepSeek.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+//            Text("Сравните обычный запрос, controlled-ответ, DeepSeek или четыре стратегии решения одной задачи.")
+//                .font(.callout)
+//                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
@@ -127,6 +129,19 @@ struct ContentView: View {
                     await sendDeepSeekRequest()
                 }
             }
+            
+            requestButton(
+                title: "4 способа решения",
+                subtitle: "Прямой, пошаговый, meta-prompt, эксперты",
+                systemImage: "person.3.sequence.fill",
+                color: .green,
+                isLoading: isReasoningExperimentLoading
+            ) {
+                hideKeyboard()
+                Task {
+                    await sendReasoningExperimentRequest()
+                }
+            }
         }
     }
     
@@ -149,7 +164,7 @@ struct ContentView: View {
                 }
             }
             
-            Text(answer.isEmpty ? "Здесь появится ответ модели." : answer)
+            Text(.init(answer.isEmpty ? "Здесь появится ответ модели." : answer))
                 .font(.body)
                 .foregroundStyle(answer.isEmpty ? .secondary : .primary)
                 .textSelection(.enabled)
@@ -267,6 +282,19 @@ struct ContentView: View {
         }
         
         isDeepSeekLoading = false
+    }
+    
+    private func sendReasoningExperimentRequest() async {
+        isReasoningExperimentLoading = true
+        answer = ""
+        
+        do {
+            answer = try await LLMService.shared.requestReasoningExperiment(prompt: prompt)
+        } catch {
+            answer = "Ошибка: \(error.localizedDescription)"
+        }
+        
+        isReasoningExperimentLoading = false
     }
     
     private func formatComparison(

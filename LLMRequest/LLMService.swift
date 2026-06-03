@@ -81,9 +81,149 @@ final class LLMService {
             stop: [stopSequence]
         )
     }
+    
+    func requestReasoningExperiment(prompt: String) async throws -> String {
+        async let directAnswer = requestDirectSolution(prompt: prompt)
+        async let stepByStepAnswer = requestStepByStepSolution(prompt: prompt)
+        async let expertGroupAnswer = requestExpertGroupSolution(prompt: prompt)
+        
+        let generatedPrompt = try await requestGeneratedPrompt(for: prompt)
+        async let generatedPromptAnswer = request(prompt: generatedPrompt, provider: defaultProvider)
+        
+        let results = try await ReasoningExperimentResult(
+            directAnswer: directAnswer,
+            stepByStepAnswer: stepByStepAnswer,
+            generatedPrompt: generatedPrompt,
+            generatedPromptAnswer: generatedPromptAnswer,
+            expertGroupAnswer: expertGroupAnswer
+        )
+        
+        let comparison = try await requestExperimentComparison(prompt: prompt, result: results)
+        
+        return formatReasoningExperiment(result: results, comparison: comparison)
+    }
 }
 
 private extension LLMService {
+    
+    struct ReasoningExperimentResult {
+        let directAnswer: String
+        let stepByStepAnswer: String
+        let generatedPrompt: String
+        let generatedPromptAnswer: String
+        let expertGroupAnswer: String
+    }
+    
+    func requestDirectSolution(prompt: String) async throws -> String {
+        try await request(prompt: prompt, provider: defaultProvider)
+    }
+    
+    func requestStepByStepSolution(prompt: String) async throws -> String {
+        let stepPrompt = """
+        \(prompt)
+        
+        Решай пошагово.
+        """
+        
+        return try await request(prompt: stepPrompt, provider: defaultProvider)
+    }
+    
+    func requestGeneratedPrompt(for prompt: String) async throws -> String {
+        let promptGenerationTask = """
+        Составь один точный промпт для решения задачи ниже.
+        Промпт должен помогать получить максимально корректное решение.
+        Верни только готовый промпт без пояснений.
+        
+        Задача:
+        \(prompt)
+        """
+        
+        return try await request(prompt: promptGenerationTask, provider: defaultProvider)
+    }
+    
+    func requestExpertGroupSolution(prompt: String) async throws -> String {
+        let expertPrompt = """
+        Реши задачу через группу экспертов.
+        
+        Задача:
+        \(prompt)
+        
+        Роли:
+        1. Аналитик: выделяет условия и ограничения.
+        2. Инженер: предлагает строгое решение.
+        3. Критик: проверяет решение на ошибки.
+        
+        Дай ответ от каждого эксперта и общий финальный вывод.
+        """
+        
+        return try await request(prompt: expertPrompt, provider: defaultProvider)
+    }
+    
+    func requestExperimentComparison(
+        prompt: String,
+        result: ReasoningExperimentResult
+    ) async throws -> String {
+        let comparisonPrompt = """
+        Сравни четыре решения одной задачи.
+        
+        Исходная задача:
+        \(prompt)
+        
+        Способ 1. Прямой ответ:
+        \(result.directAnswer)
+        
+        Способ 2. Инструкция «решай пошагово»:
+        \(result.stepByStepAnswer)
+        
+        Способ 3. Сначала сгенерирован промпт, затем использован он:
+        Сгенерированный промпт:
+        \(result.generatedPrompt)
+        
+        Ответ:
+        \(result.generatedPromptAnswer)
+        
+        Способ 4. Группа экспертов:
+        \(result.expertGroupAnswer)
+        
+        Сравни:
+        1. Отличаются ли ответы.
+        2. Какой способ дал наиболее точный результат.
+        3. Почему.
+        Ответь кратко и структурировано.
+        """
+        
+        return try await performRequest(
+            messages: [message(role: "user", content: comparisonPrompt)],
+            provider: defaultProvider,
+            maxTokens: 700
+        )
+    }
+    
+    func formatReasoningExperiment(
+        result: ReasoningExperimentResult,
+        comparison: String
+    ) -> String {
+        """
+        **Способ 1. Прямой ответ**
+        \(result.directAnswer)
+        
+        **Способ 2. Решай пошагово**
+        \(result.stepByStepAnswer)
+        
+        **Способ 3. Сначала промпт, потом решение**
+        **Сгенерированный промпт:**
+        \(result.generatedPrompt)
+        
+        **Ответ:**
+        \(result.generatedPromptAnswer)
+        
+        **Способ 4. Группа экспертов**
+        \(result.expertGroupAnswer)
+        
+        **Сравнение**
+        \(comparison)
+        """
+    }
     
     func performRequest(
         messages: [[String: String]],
