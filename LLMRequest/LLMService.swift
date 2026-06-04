@@ -45,13 +45,19 @@ final class LLMService {
     
     private init() {}
     
+    // MARK: - Proxy Default Request
+    
     func requestLLM(prompt: String) async throws -> String {
         try await request(prompt: prompt, provider: defaultProvider)
     }
     
+    // MARK: - Proxy Controlled Request
+    
     func requestControlledLLM(prompt: String) async throws -> String {
         try await requestControlled(prompt: prompt, provider: defaultProvider)
     }
+    
+    // MARK: - Provider Request
     
     func request(prompt: String, provider: LLMProvider) async throws -> String {
         let messages = [
@@ -60,6 +66,8 @@ final class LLMService {
         
         return try await performRequest(messages: messages, provider: provider)
     }
+    
+    // MARK: - Provider Controlled Request
     
     func requestControlled(prompt: String, provider: LLMProvider) async throws -> String {
         let systemPrompt = """
@@ -82,6 +90,8 @@ final class LLMService {
         )
     }
     
+    // MARK: - Reasoning Experiment Request
+    
     func requestReasoningExperiment(prompt: String) async throws -> String {
         async let directAnswer = requestDirectSolution(prompt: prompt)
         async let stepByStepAnswer = requestStepByStepSolution(prompt: prompt)
@@ -103,6 +113,8 @@ final class LLMService {
         return formatReasoningExperiment(result: results, comparison: comparison)
     }
     
+    // MARK: - Temperature Experiment Request
+    
     func requestTemperatureExperiment(prompt: String) async throws -> String {
         async let temperatureZeroAnswer = requestTemperatureSolution(prompt: prompt, temperature: 0)
         async let temperatureBalancedAnswer = requestTemperatureSolution(prompt: prompt, temperature: 0.7)
@@ -122,6 +134,8 @@ final class LLMService {
 
 private extension LLMService {
     
+    // MARK: - Experiment Models
+    
     struct ReasoningExperimentResult {
         let directAnswer: String
         let stepByStepAnswer: String
@@ -135,6 +149,8 @@ private extension LLMService {
         let temperatureBalancedAnswer: String
         let temperatureCreativeAnswer: String
     }
+    
+    // MARK: - Reasoning Experiment Helpers
     
     func requestDirectSolution(prompt: String) async throws -> String {
         try await request(prompt: prompt, provider: defaultProvider)
@@ -221,6 +237,8 @@ private extension LLMService {
         )
     }
     
+    // MARK: - Reasoning Experiment Formatting
+    
     func formatReasoningExperiment(
         result: ReasoningExperimentResult,
         comparison: String
@@ -246,6 +264,8 @@ private extension LLMService {
         \(comparison)
         """
     }
+    
+    // MARK: - Temperature Experiment Helpers
     
     func requestTemperatureSolution(prompt: String, temperature: Double) async throws -> String {
         try await performRequest(
@@ -290,6 +310,8 @@ private extension LLMService {
         )
     }
     
+    // MARK: - Temperature Experiment Formatting
+    
     func formatTemperatureExperiment(
         result: TemperatureExperimentResult,
         comparison: String
@@ -308,6 +330,8 @@ private extension LLMService {
         \(comparison)
         """
     }
+    
+    // MARK: - Network Request
     
     func performRequest(
         messages: [[String: String]],
@@ -360,6 +384,8 @@ private extension LLMService {
         
         return content ?? String(data: data, encoding: .utf8) ?? "Нет ответа"
     }
+    
+    // MARK: - Request Helpers
     
     func apiKey(for provider: LLMProvider) -> String {
         switch provider {
