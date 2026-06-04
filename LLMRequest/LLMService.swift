@@ -102,6 +102,22 @@ final class LLMService {
         
         return formatReasoningExperiment(result: results, comparison: comparison)
     }
+    
+    func requestTemperatureExperiment(prompt: String) async throws -> String {
+        async let temperatureZeroAnswer = requestTemperatureSolution(prompt: prompt, temperature: 0)
+        async let temperatureBalancedAnswer = requestTemperatureSolution(prompt: prompt, temperature: 0.7)
+        async let temperatureCreativeAnswer = requestTemperatureSolution(prompt: prompt, temperature: 1.2)
+        
+        let result = try await TemperatureExperimentResult(
+            temperatureZeroAnswer: temperatureZeroAnswer,
+            temperatureBalancedAnswer: temperatureBalancedAnswer,
+            temperatureCreativeAnswer: temperatureCreativeAnswer
+        )
+        
+        let comparison = try await requestTemperatureComparison(prompt: prompt, result: result)
+        
+        return formatTemperatureExperiment(result: result, comparison: comparison)
+    }
 }
 
 private extension LLMService {
@@ -112,6 +128,12 @@ private extension LLMService {
         let generatedPrompt: String
         let generatedPromptAnswer: String
         let expertGroupAnswer: String
+    }
+    
+    struct TemperatureExperimentResult {
+        let temperatureZeroAnswer: String
+        let temperatureBalancedAnswer: String
+        let temperatureCreativeAnswer: String
     }
     
     func requestDirectSolution(prompt: String) async throws -> String {
@@ -225,11 +247,75 @@ private extension LLMService {
         """
     }
     
+    func requestTemperatureSolution(prompt: String, temperature: Double) async throws -> String {
+        try await performRequest(
+            messages: [message(role: "user", content: prompt)],
+            provider: .deepSeek,
+            maxTokens: 1000,
+            temperature: temperature,
+            disablesThinking: true
+        )
+    }
+    
+    func requestTemperatureComparison(
+        prompt: String,
+        result: TemperatureExperimentResult
+    ) async throws -> String {
+        let comparisonPrompt = """
+        Сравни три ответа на один и тот же запрос, выполненные с разной temperature.
+        
+        Исходный запрос:
+        \(prompt)
+        
+        Temperature 0:
+        \(result.temperatureZeroAnswer)
+        
+        Temperature 0.7:
+        \(result.temperatureBalancedAnswer)
+        
+        Temperature 1.2:
+        \(result.temperatureCreativeAnswer)
+        
+        Сравни ответы по точности, креативности и разнообразию.
+        Сформулируй, для каких задач лучше подходит temperature 0, 0.7 и 1.2.
+        Ответь кратко и структурировано.
+        """
+        
+        return try await performRequest(
+            messages: [message(role: "user", content: comparisonPrompt)],
+            provider: .deepSeek,
+            maxTokens: 700,
+            temperature: 0,
+            disablesThinking: true
+        )
+    }
+    
+    func formatTemperatureExperiment(
+        result: TemperatureExperimentResult,
+        comparison: String
+    ) -> String {
+        """
+        **Temperature 0**
+        \(result.temperatureZeroAnswer)
+        
+        **Temperature 0.7**
+        \(result.temperatureBalancedAnswer)
+        
+        **Temperature 1.2**
+        \(result.temperatureCreativeAnswer)
+        
+        **Сравнение и выводы**
+        \(comparison)
+        """
+    }
+    
     func performRequest(
         messages: [[String: String]],
         provider: LLMProvider,
         maxTokens: Int? = nil,
-        stop: [String]? = nil
+        stop: [String]? = nil,
+        temperature: Double? = nil,
+        disablesThinking: Bool = false
     ) async throws -> String {
         
         var request = URLRequest(url: provider.url)
@@ -248,6 +334,14 @@ private extension LLMService {
         
         if let stop {
             body["stop"] = stop
+        }
+        
+        if let temperature {
+            body["temperature"] = temperature
+        }
+        
+        if disablesThinking {
+            body["thinking"] = ["type": "disabled"]
         }
         
         request.httpBody = try JSONSerialization.data(withJSONObject: body)

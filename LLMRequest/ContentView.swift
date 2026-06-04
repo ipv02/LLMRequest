@@ -9,16 +9,17 @@ import SwiftUI
 
 struct ContentView: View {
     
-    @State private var prompt = "В коробке 12 шаров: 5 красных, 4 синих и 3 зеленых. Сколько минимум шаров нужно достать вслепую, чтобы гарантированно получить два шара одного цвета?"
+    @State private var prompt = "Придумай 3 необычных способа использования обычного кирпича, кроме строительства"
     @State private var answer = ""
     @State private var isProxyLoading = false
     @State private var isDeepSeekLoading = false
     @State private var isReasoningExperimentLoading = false
+    @State private var isTemperatureExperimentLoading = false
     
     @FocusState private var isPromptFocused: Bool
     
     private var isRequestRunning: Bool {
-        isProxyLoading || isDeepSeekLoading || isReasoningExperimentLoading
+        isProxyLoading || isDeepSeekLoading || isReasoningExperimentLoading || isTemperatureExperimentLoading
     }
     
     var body: some View {
@@ -140,6 +141,19 @@ struct ContentView: View {
                 hideKeyboard()
                 Task {
                     await sendReasoningExperimentRequest()
+                }
+            }
+            
+            requestButton(
+                title: "Температура",
+                subtitle: "DeepSeek: 0, 0.7, 1.2",
+                systemImage: "thermometer.variable",
+                color: .orange,
+                isLoading: isTemperatureExperimentLoading
+            ) {
+                hideKeyboard()
+                Task {
+                    await sendTemperatureExperimentRequest()
                 }
             }
         }
@@ -295,6 +309,19 @@ struct ContentView: View {
         }
         
         isReasoningExperimentLoading = false
+    }
+    
+    private func sendTemperatureExperimentRequest() async {
+        isTemperatureExperimentLoading = true
+        answer = ""
+        
+        do {
+            answer = try await LLMService.shared.requestTemperatureExperiment(prompt: prompt)
+        } catch {
+            answer = "Ошибка: \(error.localizedDescription)"
+        }
+        
+        isTemperatureExperimentLoading = false
     }
     
     private func formatComparison(
