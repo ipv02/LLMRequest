@@ -160,7 +160,7 @@ struct ContentView: View {
             
             requestButton(
                 title: "Модели HF",
-                subtitle: "Qwen 0.5B, 7B, 72B",
+                subtitle: "Qwen 4B, 7B, 72B",
                 systemImage: "chart.bar.xaxis",
                 color: .teal,
                 isLoading: isModelComparisonLoading

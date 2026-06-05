@@ -177,25 +177,18 @@ private extension LLMService {
         var modelID: String {
             switch self {
             case .weak:
-                "Qwen/Qwen2.5-0.5B-Instruct:cheapest"
+                "Qwen/Qwen3-4B-Instruct-2507:cheapest"
             case .medium:
                 "Qwen/Qwen2.5-7B-Instruct:cheapest"
             case .strong:
                 "Qwen/Qwen2.5-72B-Instruct:cheapest"
             }
         }
-        
-        var displayName: String {
-            modelID.replacingOccurrences(of: ":cheapest", with: "")
-        }
-        
-        var modelURL: String {
-            "https://huggingface.co/\(displayName)"
-        }
     }
     
     struct HuggingFaceModelResult {
         let level: HuggingFaceModelLevel
+        let modelID: String
         let answer: String
         let responseTime: TimeInterval
         let promptTokens: Int?
@@ -403,14 +396,10 @@ private extension LLMService {
             maxTokens: 500
         )
         
-        return HuggingFaceModelResult(
+        return makeHuggingFaceModelResult(
             level: model,
-            answer: response.content,
-            responseTime: response.responseTime,
-            promptTokens: response.promptTokens,
-            completionTokens: response.completionTokens,
-            totalTokens: response.totalTokens,
-            estimatedCost: response.estimatedCost
+            modelID: model.modelID,
+            response: response
         )
     }
     
@@ -424,21 +413,21 @@ private extension LLMService {
         Исходный запрос:
         \(prompt)
         
-        Слабая модель \(result.weakModel.level.displayName):
+        Слабая модель \(displayName(for: result.weakModel.modelID)):
         Время: \(formatSeconds(result.weakModel.responseTime))
         Токены: \(formatTokens(result.weakModel))
         Стоимость: \(result.weakModel.estimatedCost)
         Ответ:
         \(result.weakModel.answer)
         
-        Средняя модель \(result.mediumModel.level.displayName):
+        Средняя модель \(displayName(for: result.mediumModel.modelID)):
         Время: \(formatSeconds(result.mediumModel.responseTime))
         Токены: \(formatTokens(result.mediumModel))
         Стоимость: \(result.mediumModel.estimatedCost)
         Ответ:
         \(result.mediumModel.answer)
         
-        Сильная модель \(result.strongModel.level.displayName):
+        Сильная модель \(displayName(for: result.strongModel.modelID)):
         Время: \(formatSeconds(result.strongModel.responseTime))
         Токены: \(formatTokens(result.strongModel))
         Стоимость: \(result.strongModel.estimatedCost)
@@ -463,24 +452,24 @@ private extension LLMService {
         comparison: String
     ) -> String {
         """
-        **Слабая модель: \(result.weakModel.level.displayName)**
-        Ссылка: \(result.weakModel.level.modelURL)
+        **Слабая модель: \(displayName(for: result.weakModel.modelID))**
+        Ссылка: \(modelURL(for: result.weakModel.modelID))
         Время ответа: \(formatSeconds(result.weakModel.responseTime))
         Токены: \(formatTokens(result.weakModel))
         Стоимость: \(result.weakModel.estimatedCost)
         
         \(result.weakModel.answer)
         
-        **Средняя модель: \(result.mediumModel.level.displayName)**
-        Ссылка: \(result.mediumModel.level.modelURL)
+        **Средняя модель: \(displayName(for: result.mediumModel.modelID))**
+        Ссылка: \(modelURL(for: result.mediumModel.modelID))
         Время ответа: \(formatSeconds(result.mediumModel.responseTime))
         Токены: \(formatTokens(result.mediumModel))
         Стоимость: \(result.mediumModel.estimatedCost)
         
         \(result.mediumModel.answer)
         
-        **Сильная модель: \(result.strongModel.level.displayName)**
-        Ссылка: \(result.strongModel.level.modelURL)
+        **Сильная модель: \(displayName(for: result.strongModel.modelID))**
+        Ссылка: \(modelURL(for: result.strongModel.modelID))
         Время ответа: \(formatSeconds(result.strongModel.responseTime))
         Токены: \(formatTokens(result.strongModel))
         Стоимость: \(result.strongModel.estimatedCost)
@@ -614,6 +603,31 @@ private extension LLMService {
     }
     
     // MARK: - Request Helpers
+    
+    func makeHuggingFaceModelResult(
+        level: HuggingFaceModelLevel,
+        modelID: String,
+        response: HuggingFaceResponse
+    ) -> HuggingFaceModelResult {
+        HuggingFaceModelResult(
+            level: level,
+            modelID: modelID,
+            answer: response.content,
+            responseTime: response.responseTime,
+            promptTokens: response.promptTokens,
+            completionTokens: response.completionTokens,
+            totalTokens: response.totalTokens,
+            estimatedCost: response.estimatedCost
+        )
+    }
+    
+    func displayName(for modelID: String) -> String {
+        modelID.replacingOccurrences(of: ":cheapest", with: "")
+    }
+    
+    func modelURL(for modelID: String) -> String {
+        "https://huggingface.co/\(displayName(for: modelID))"
+    }
     
     func formatSeconds(_ seconds: TimeInterval) -> String {
         String(format: "%.2f сек", seconds)
