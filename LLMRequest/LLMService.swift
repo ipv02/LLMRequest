@@ -39,6 +39,7 @@ final class LLMService {
     
     private let proxyAPIKey = "PROXY_API_KEY"
     private let deepSeekAPIKey = "DEEPSEEK_API_KEY"
+    private let huggingFaceAPIKey = "HF_TOKEN"
     
     private let stopSequence = "###END###"
     private let defaultProvider: LLMProvider = .proxyOpenAI
@@ -130,6 +131,24 @@ final class LLMService {
         
         return formatTemperatureExperiment(result: result, comparison: comparison)
     }
+    
+    // MARK: - Hugging Face Model Comparison Request
+    
+    func requestHuggingFaceModelComparisonExperiment(prompt: String) async throws -> String {
+        async let weakModelResult = requestHuggingFaceModel(prompt: prompt, model: .weak)
+        async let mediumModelResult = requestHuggingFaceModel(prompt: prompt, model: .medium)
+        async let strongModelResult = requestHuggingFaceModel(prompt: prompt, model: .strong)
+        
+        let result = try await HuggingFaceModelComparisonResult(
+            weakModel: weakModelResult,
+            mediumModel: mediumModelResult,
+            strongModel: strongModelResult
+        )
+        
+        let comparison = try await requestHuggingFaceModelComparison(prompt: prompt, result: result)
+        
+        return formatHuggingFaceModelComparison(result: result, comparison: comparison)
+    }
 }
 
 private extension LLMService {
@@ -148,6 +167,47 @@ private extension LLMService {
         let temperatureZeroAnswer: String
         let temperatureBalancedAnswer: String
         let temperatureCreativeAnswer: String
+    }
+    
+    enum HuggingFaceModelLevel: String {
+        case weak = "Слабая"
+        case medium = "Средняя"
+        case strong = "Сильная"
+        
+        var modelID: String {
+            switch self {
+            case .weak:
+                "Qwen/Qwen2.5-0.5B-Instruct:cheapest"
+            case .medium:
+                "Qwen/Qwen2.5-7B-Instruct:cheapest"
+            case .strong:
+                "Qwen/Qwen2.5-72B-Instruct:cheapest"
+            }
+        }
+        
+        var displayName: String {
+            modelID.replacingOccurrences(of: ":cheapest", with: "")
+        }
+        
+        var modelURL: String {
+            "https://huggingface.co/\(displayName)"
+        }
+    }
+    
+    struct HuggingFaceModelResult {
+        let level: HuggingFaceModelLevel
+        let answer: String
+        let responseTime: TimeInterval
+        let promptTokens: Int?
+        let completionTokens: Int?
+        let totalTokens: Int?
+        let estimatedCost: String
+    }
+    
+    struct HuggingFaceModelComparisonResult {
+        let weakModel: HuggingFaceModelResult
+        let mediumModel: HuggingFaceModelResult
+        let strongModel: HuggingFaceModelResult
     }
     
     // MARK: - Reasoning Experiment Helpers
@@ -331,7 +391,175 @@ private extension LLMService {
         """
     }
     
+    // MARK: - Hugging Face Model Comparison Helpers
+    
+    func requestHuggingFaceModel(
+        prompt: String,
+        model: HuggingFaceModelLevel
+    ) async throws -> HuggingFaceModelResult {
+        let response = try await performHuggingFaceRequest(
+            messages: [message(role: "user", content: prompt)],
+            model: model.modelID,
+            maxTokens: 500
+        )
+        
+        return HuggingFaceModelResult(
+            level: model,
+            answer: response.content,
+            responseTime: response.responseTime,
+            promptTokens: response.promptTokens,
+            completionTokens: response.completionTokens,
+            totalTokens: response.totalTokens,
+            estimatedCost: response.estimatedCost
+        )
+    }
+    
+    func requestHuggingFaceModelComparison(
+        prompt: String,
+        result: HuggingFaceModelComparisonResult
+    ) async throws -> String {
+        let comparisonPrompt = """
+        Сравни ответы трех моделей Hugging Face на один и тот же запрос.
+        
+        Исходный запрос:
+        \(prompt)
+        
+        Слабая модель \(result.weakModel.level.displayName):
+        Время: \(formatSeconds(result.weakModel.responseTime))
+        Токены: \(formatTokens(result.weakModel))
+        Стоимость: \(result.weakModel.estimatedCost)
+        Ответ:
+        \(result.weakModel.answer)
+        
+        Средняя модель \(result.mediumModel.level.displayName):
+        Время: \(formatSeconds(result.mediumModel.responseTime))
+        Токены: \(formatTokens(result.mediumModel))
+        Стоимость: \(result.mediumModel.estimatedCost)
+        Ответ:
+        \(result.mediumModel.answer)
+        
+        Сильная модель \(result.strongModel.level.displayName):
+        Время: \(formatSeconds(result.strongModel.responseTime))
+        Токены: \(formatTokens(result.strongModel))
+        Стоимость: \(result.strongModel.estimatedCost)
+        Ответ:
+        \(result.strongModel.answer)
+        
+        Сравни качество ответов, скорость и ресурсоемкость.
+        Сформулируй короткий вывод: для каких задач подходит слабая, средняя и сильная модель.
+        """
+        
+        let response = try await performHuggingFaceRequest(
+            messages: [message(role: "user", content: comparisonPrompt)],
+            model: HuggingFaceModelLevel.strong.modelID,
+            maxTokens: 700
+        )
+        
+        return response.content
+    }
+    
+    func formatHuggingFaceModelComparison(
+        result: HuggingFaceModelComparisonResult,
+        comparison: String
+    ) -> String {
+        """
+        **Слабая модель: \(result.weakModel.level.displayName)**
+        Ссылка: \(result.weakModel.level.modelURL)
+        Время ответа: \(formatSeconds(result.weakModel.responseTime))
+        Токены: \(formatTokens(result.weakModel))
+        Стоимость: \(result.weakModel.estimatedCost)
+        
+        \(result.weakModel.answer)
+        
+        **Средняя модель: \(result.mediumModel.level.displayName)**
+        Ссылка: \(result.mediumModel.level.modelURL)
+        Время ответа: \(formatSeconds(result.mediumModel.responseTime))
+        Токены: \(formatTokens(result.mediumModel))
+        Стоимость: \(result.mediumModel.estimatedCost)
+        
+        \(result.mediumModel.answer)
+        
+        **Сильная модель: \(result.strongModel.level.displayName)**
+        Ссылка: \(result.strongModel.level.modelURL)
+        Время ответа: \(formatSeconds(result.strongModel.responseTime))
+        Токены: \(formatTokens(result.strongModel))
+        Стоимость: \(result.strongModel.estimatedCost)
+        
+        \(result.strongModel.answer)
+        
+        **Короткий вывод о различиях**
+        \(comparison)
+        """
+    }
+    
     // MARK: - Network Request
+    
+    struct HuggingFaceResponse {
+        let content: String
+        let responseTime: TimeInterval
+        let promptTokens: Int?
+        let completionTokens: Int?
+        let totalTokens: Int?
+        let estimatedCost: String
+    }
+    
+    func performHuggingFaceRequest(
+        messages: [[String: String]],
+        model: String,
+        maxTokens: Int? = nil
+    ) async throws -> HuggingFaceResponse {
+        let url = URL(string: "https://router.huggingface.co/v1/chat/completions")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(huggingFaceAPIKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        var body: [String: Any] = [
+            "model": model,
+            "messages": messages
+        ]
+        
+        if let maxTokens {
+            body["max_tokens"] = maxTokens
+        }
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let startedAt = Date()
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let responseTime = Date().timeIntervalSince(startedAt)
+        
+        if let httpResponse = response as? HTTPURLResponse,
+           !(200...299).contains(httpResponse.statusCode) {
+            let errorBody = String(data: data, encoding: .utf8) ?? "Ошибка Hugging Face API"
+            return HuggingFaceResponse(
+                content: errorBody,
+                responseTime: responseTime,
+                promptTokens: nil,
+                completionTokens: nil,
+                totalTokens: nil,
+                estimatedCost: "Не рассчитана: API вернул ошибку"
+            )
+        }
+        
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let choices = json?["choices"] as? [[String: Any]]
+        let message = choices?.first?["message"] as? [String: Any]
+        let content = message?["content"] as? String
+        let usage = json?["usage"] as? [String: Any]
+        let promptTokens = usage?["prompt_tokens"] as? Int
+        let completionTokens = usage?["completion_tokens"] as? Int
+        let totalTokens = usage?["total_tokens"] as? Int
+        
+        return HuggingFaceResponse(
+            content: content ?? String(data: data, encoding: .utf8) ?? "Нет ответа",
+            responseTime: responseTime,
+            promptTokens: promptTokens,
+            completionTokens: completionTokens,
+            totalTokens: totalTokens,
+            estimatedCost: "0 USD в рамках free tier / pricing не возвращен chat-ответом"
+        )
+    }
     
     func performRequest(
         messages: [[String: String]],
@@ -386,6 +614,18 @@ private extension LLMService {
     }
     
     // MARK: - Request Helpers
+    
+    func formatSeconds(_ seconds: TimeInterval) -> String {
+        String(format: "%.2f сек", seconds)
+    }
+    
+    func formatTokens(_ result: HuggingFaceModelResult) -> String {
+        let prompt = result.promptTokens.map(String.init) ?? "нет данных"
+        let completion = result.completionTokens.map(String.init) ?? "нет данных"
+        let total = result.totalTokens.map(String.init) ?? "нет данных"
+        
+        return "prompt: \(prompt), completion: \(completion), total: \(total)"
+    }
     
     func apiKey(for provider: LLMProvider) -> String {
         switch provider {

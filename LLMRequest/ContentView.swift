@@ -9,17 +9,18 @@ import SwiftUI
 
 struct ContentView: View {
     
-    @State private var prompt = "Придумай 3 необычных способа использования обычного кирпича, кроме строительства"
+    @State private var prompt = "Объясни что такое LLM"
     @State private var answer = ""
     @State private var isProxyLoading = false
     @State private var isDeepSeekLoading = false
     @State private var isReasoningExperimentLoading = false
     @State private var isTemperatureExperimentLoading = false
+    @State private var isModelComparisonLoading = false
     
     @FocusState private var isPromptFocused: Bool
     
     private var isRequestRunning: Bool {
-        isProxyLoading || isDeepSeekLoading || isReasoningExperimentLoading || isTemperatureExperimentLoading
+        isProxyLoading || isDeepSeekLoading || isReasoningExperimentLoading || isTemperatureExperimentLoading || isModelComparisonLoading
     }
     
     var body: some View {
@@ -154,6 +155,19 @@ struct ContentView: View {
                 hideKeyboard()
                 Task {
                     await sendTemperatureExperimentRequest()
+                }
+            }
+            
+            requestButton(
+                title: "Модели HF",
+                subtitle: "Qwen 0.5B, 7B, 72B",
+                systemImage: "chart.bar.xaxis",
+                color: .teal,
+                isLoading: isModelComparisonLoading
+            ) {
+                hideKeyboard()
+                Task {
+                    await sendModelComparisonRequest()
                 }
             }
         }
@@ -322,6 +336,19 @@ struct ContentView: View {
         }
         
         isTemperatureExperimentLoading = false
+    }
+    
+    private func sendModelComparisonRequest() async {
+        isModelComparisonLoading = true
+        answer = ""
+        
+        do {
+            answer = try await LLMService.shared.requestHuggingFaceModelComparisonExperiment(prompt: prompt)
+        } catch {
+            answer = "Ошибка: \(error.localizedDescription)"
+        }
+        
+        isModelComparisonLoading = false
     }
     
     private func formatComparison(
