@@ -33,6 +33,62 @@ extension LLMService {
     }
 }
 
+extension LLMService {
+    
+    enum HuggingFaceModelLevel: String {
+        case weak = "Слабая"
+        case medium = "Средняя"
+        case strong = "Сильная"
+        
+        var modelID: String {
+            switch self {
+            case .weak:
+                "Qwen/Qwen3-4B-Instruct-2507:cheapest"
+            case .medium:
+                "Qwen/Qwen2.5-7B-Instruct:cheapest"
+            case .strong:
+                "Qwen/Qwen2.5-72B-Instruct:cheapest"
+            }
+        }
+    }
+    
+    struct HuggingFaceModelResult {
+        let level: HuggingFaceModelLevel
+        let modelID: String
+        let answer: String
+        let responseTime: TimeInterval
+        let promptTokens: Int?
+        let completionTokens: Int?
+        let totalTokens: Int?
+        let estimatedCost: String
+    }
+    
+    struct HuggingFaceModelComparisonResult {
+        let weakModel: HuggingFaceModelResult
+        let mediumModel: HuggingFaceModelResult
+        let strongModel: HuggingFaceModelResult
+    }
+}
+
+extension LLMService {
+    
+    // MARK: - Experiment Models
+    
+    struct ReasoningExperimentResult {
+        let directAnswer: String
+        let stepByStepAnswer: String
+        let generatedPrompt: String
+        let generatedPromptAnswer: String
+        let expertGroupAnswer: String
+    }
+    
+    struct TemperatureExperimentResult {
+        let temperatureZeroAnswer: String
+        let temperatureBalancedAnswer: String
+        let temperatureCreativeAnswer: String
+    }
+}
+
 final class LLMService {
     
     static let shared = LLMService()
@@ -152,56 +208,6 @@ final class LLMService {
 }
 
 private extension LLMService {
-    
-    // MARK: - Experiment Models
-    
-    struct ReasoningExperimentResult {
-        let directAnswer: String
-        let stepByStepAnswer: String
-        let generatedPrompt: String
-        let generatedPromptAnswer: String
-        let expertGroupAnswer: String
-    }
-    
-    struct TemperatureExperimentResult {
-        let temperatureZeroAnswer: String
-        let temperatureBalancedAnswer: String
-        let temperatureCreativeAnswer: String
-    }
-    
-    enum HuggingFaceModelLevel: String {
-        case weak = "Слабая"
-        case medium = "Средняя"
-        case strong = "Сильная"
-        
-        var modelID: String {
-            switch self {
-            case .weak:
-                "Qwen/Qwen3-4B-Instruct-2507:cheapest"
-            case .medium:
-                "Qwen/Qwen2.5-7B-Instruct:cheapest"
-            case .strong:
-                "Qwen/Qwen2.5-72B-Instruct:cheapest"
-            }
-        }
-    }
-    
-    struct HuggingFaceModelResult {
-        let level: HuggingFaceModelLevel
-        let modelID: String
-        let answer: String
-        let responseTime: TimeInterval
-        let promptTokens: Int?
-        let completionTokens: Int?
-        let totalTokens: Int?
-        let estimatedCost: String
-    }
-    
-    struct HuggingFaceModelComparisonResult {
-        let weakModel: HuggingFaceModelResult
-        let mediumModel: HuggingFaceModelResult
-        let strongModel: HuggingFaceModelResult
-    }
     
     // MARK: - Reasoning Experiment Helpers
     
