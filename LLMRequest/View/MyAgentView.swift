@@ -60,22 +60,16 @@ struct MyAgentView: View {
     }
 
     private var chatHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("Code Assistant", systemImage: "chevron.left.forwardslash.chevron.right")
-                .font(.title2.bold())
-                .foregroundStyle(.primary)
-
-            Text("Агент хранит контекст текущей сессии и вызывает DeepSeek через отдельный MyAgentService.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(.white.opacity(0.5), lineWidth: 1)
-        }
+        Label("Code Assistant", systemImage: "chevron.left.forwardslash.chevron.right")
+            .font(.title2.bold())
+            .foregroundStyle(.primary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(.white.opacity(0.5), lineWidth: 1)
+            }
     }
 
     private var messagesList: some View {
